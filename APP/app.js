@@ -163,11 +163,6 @@ class VideoManager {
     }
 
     resizeCanvas() {
-        if (this.mode === 'LIVE') {
-            this.canvasMain.width = CONFIG.width;
-            this.canvasMain.height = CONFIG.height;
-            return;
-        }
         const stage = document.querySelector('.video-stage');
         if (!stage) return;
         const rect = stage.getBoundingClientRect();
