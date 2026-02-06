@@ -420,7 +420,6 @@ class VideoManager {
     }
     drawOverlay() {
         const ctx = this.ctxMain; ctx.lineWidth = 2;
-        ctx.strokeStyle = "#00ff00"; ctx.beginPath(); ctx.moveTo(0, 360); ctx.lineTo(640, 360); ctx.stroke();
         const rID = this.getScreenRegion(CONFIG.screenRegions.id) || CONFIG.regions.id;
         ctx.strokeStyle = "rgba(0, 150, 255, 0.5)"; ctx.strokeRect(rID.x, rID.y, rID.w, rID.h);
         const rClk = this.getScreenRegion(CONFIG.screenRegions.clock) || CONFIG.regions.clock;
