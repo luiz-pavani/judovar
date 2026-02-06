@@ -446,11 +446,13 @@ class ReplaySystem {
         document.getElementById('replay-overlay').style.display = 'flex';
         this.playbackSpeed = 0.5;
         this.setPlayIcon(true);
+        document.getElementById('main-canvas').classList.add('replay-full');
     }
     exitReplayMode() {
         this.isReplaying = false; document.getElementById('replay-overlay').style.display = 'none';
         this.slider.value = 100; this.timeDisplay.innerText = "LIVE";
         this.setPlayIcon(false);
+        document.getElementById('main-canvas').classList.remove('replay-full');
         this.loopA = null; this.loopB = null;
         document.getElementById('btn-loop-a').classList.remove('active');
         document.getElementById('btn-loop-b').classList.remove('active');
