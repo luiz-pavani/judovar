@@ -237,10 +237,10 @@ class VideoManager {
             if (this.vidCam.readyState >= 2) {
                 const vw = this.vidCam.videoWidth || 1280;
                 const vh = this.vidCam.videoHeight || 720;
-                const scale = Math.min(cw / vw, halfH / vh);
-                const dw = vw * scale;
+                const scale = cw / vw;
+                const dw = cw;
                 const dh = vh * scale;
-                const dx = (cw - dw) / 2;
+                const dx = 0;
                 const dy = (halfH - dh) / 2;
                 this.ctxMain.drawImage(this.vidCam, dx, dy, dw, dh);
             }
@@ -248,10 +248,10 @@ class VideoManager {
             if (this.vidScreen.readyState >= 2) {
                 const vw = this.vidScreen.videoWidth || 1920;
                 const vh = this.vidScreen.videoHeight || 1080;
-                const scale = Math.min(cw / vw, halfH / vh);
-                const dw = vw * scale;
+                const scale = cw / vw;
+                const dw = cw;
                 const dh = vh * scale;
-                const dx = (cw - dw) / 2;
+                const dx = 0;
                 const dy = halfH + (halfH - dh) / 2;
                 this.ctxMain.drawImage(this.vidScreen, dx, dy, dw, dh);
                 this.brain.processFrame(this.canvasMain); 
