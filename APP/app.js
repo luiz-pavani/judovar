@@ -230,9 +230,30 @@ class VideoManager {
             const cw = this.canvasMain.width;
             const ch = this.canvasMain.height;
             const halfH = ch / 2;
-            if (this.vidCam.readyState >= 2) this.ctxMain.drawImage(this.vidCam, 0, 0, cw, halfH);
+            
+            this.ctxMain.fillStyle = "#000";
+            this.ctxMain.fillRect(0, 0, cw, ch);
+            
+            if (this.vidCam.readyState >= 2) {
+                const vw = this.vidCam.videoWidth || 1280;
+                const vh = this.vidCam.videoHeight || 720;
+                const scale = Math.min(cw / vw, halfH / vh);
+                const dw = vw * scale;
+                const dh = vh * scale;
+                const dx = (cw - dw) / 2;
+                const dy = (halfH - dh) / 2;
+                this.ctxMain.drawImage(this.vidCam, dx, dy, dw, dh);
+            }
+            
             if (this.vidScreen.readyState >= 2) {
-                this.ctxMain.drawImage(this.vidScreen, 0, halfH, cw, halfH);
+                const vw = this.vidScreen.videoWidth || 1920;
+                const vh = this.vidScreen.videoHeight || 1080;
+                const scale = Math.min(cw / vw, halfH / vh);
+                const dw = vw * scale;
+                const dh = vh * scale;
+                const dx = (cw - dw) / 2;
+                const dy = halfH + (halfH - dh) / 2;
+                this.ctxMain.drawImage(this.vidScreen, dx, dy, dw, dh);
                 this.brain.processFrame(this.canvasMain); 
             }
             if (this.showZones) this.drawOverlay();
