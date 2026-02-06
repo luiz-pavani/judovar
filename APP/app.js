@@ -174,6 +174,10 @@ class VideoManager {
         
         this.showZones = true;
         this.screenRect = null;
+        this.isDrawingZone = false;
+        this.zoneStart = null;
+        this.zoneDraft = null;
+        this.zoneEditTarget = 'id';
         this.scale = 1; this.panning = false; this.pointX = 0; this.pointY = 0; this.startX = 0; this.startY = 0;
         this.setupZoom();
         this.resizeCanvas();
@@ -188,6 +192,7 @@ class VideoManager {
             if (this.showZones) {
                 btnZones.classList.add('active');
                 if(robotPanel) robotPanel.style.display = 'block';
+                if (this.ui) this.ui.log("ZONAS: arraste no placar (SHIFT = CRONÔMETRO)", "neutral");
             } else {
                 btnZones.classList.remove('active');
                 if(robotPanel) robotPanel.style.display = 'none';
@@ -195,6 +200,8 @@ class VideoManager {
         };
         applyZoneState();
         btnZones.onclick = () => { this.showZones = !this.showZones; applyZoneState(); };
+
+        this.bindZoneDrawing();
 
         this.loop();
     }
@@ -235,6 +242,62 @@ class VideoManager {
             this.pointX = e.clientX - this.startX; this.pointY = e.clientY - this.startY;
             this.updateTransform();
         });
+    }
+    bindZoneDrawing() {
+        const canvas = this.canvasMain;
+        if (!canvas) return;
+
+        const getCanvasPoint = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        };
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!this.showZones || this.mode !== 'LIVE') return;
+            if (!this.screenRect) return;
+            this.zoneEditTarget = e.shiftKey ? 'clock' : 'id';
+            this.isDrawingZone = true;
+            this.zoneStart = getCanvasPoint(e);
+            this.zoneDraft = { x: this.zoneStart.x, y: this.zoneStart.y, w: 0, h: 0, target: this.zoneEditTarget };
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!this.isDrawingZone || !this.zoneStart) return;
+            const p = getCanvasPoint(e);
+            const x1 = this.zoneStart.x;
+            const y1 = this.zoneStart.y;
+            const x2 = p.x;
+            const y2 = p.y;
+            const x = Math.min(x1, x2);
+            const y = Math.min(y1, y2);
+            const w = Math.abs(x2 - x1);
+            const h = Math.abs(y2 - y1);
+            this.zoneDraft = { x, y, w, h, target: this.zoneEditTarget };
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!this.isDrawingZone || !this.zoneDraft) return;
+            const rect = this.clampToScreen(this.zoneDraft);
+            const mapped = this.canvasRectToScreenRegion(rect);
+            if (mapped) {
+                const next = { ...CONFIG.screenRegions };
+                next[this.zoneDraft.target] = mapped;
+                saveScreenRegions(next);
+                if (window.updateZoneInputs) window.updateZoneInputs(next);
+            }
+            this.isDrawingZone = false;
+            this.zoneStart = null;
+            this.zoneDraft = null;
+        });
+    }
+    clampToScreen(rect) {
+        if (!this.screenRect) return rect;
+        const sr = this.screenRect;
+        const x = Math.max(sr.x, Math.min(rect.x, sr.x + sr.w));
+        const y = Math.max(sr.y, Math.min(rect.y, sr.y + sr.h));
+        const maxX = Math.max(sr.x, Math.min(rect.x + rect.w, sr.x + sr.w));
+        const maxY = Math.max(sr.y, Math.min(rect.y + rect.h, sr.y + sr.h));
+        return { x, y, w: Math.max(1, maxX - x), h: Math.max(1, maxY - y), target: rect.target };
     }
     updateTransform() {
         this.canvasMain.style.transform = `translate(${this.pointX}px, ${this.pointY}px) scale(${this.scale})`;
@@ -339,6 +402,22 @@ class VideoManager {
             h: region.h * scaleY
         };
     }
+    canvasRectToScreenRegion(rect) {
+        if (!this.screenRect) return null;
+        const sr = this.screenRect;
+        const scaleX = sr.w / sr.videoWidth;
+        const scaleY = sr.h / sr.videoHeight;
+        const x = (rect.x - sr.x) / scaleX;
+        const y = (rect.y - sr.y) / scaleY;
+        const w = rect.w / scaleX;
+        const h = rect.h / scaleY;
+        return {
+            x: Math.max(0, Math.round(x)),
+            y: Math.max(0, Math.round(y)),
+            w: Math.max(1, Math.round(w)),
+            h: Math.max(1, Math.round(h))
+        };
+    }
     drawOverlay() {
         const ctx = this.ctxMain; ctx.lineWidth = 2;
         ctx.strokeStyle = "#00ff00"; ctx.beginPath(); ctx.moveTo(0, 360); ctx.lineTo(640, 360); ctx.stroke();
@@ -346,6 +425,14 @@ class VideoManager {
         ctx.strokeStyle = "rgba(0, 150, 255, 0.5)"; ctx.strokeRect(rID.x, rID.y, rID.w, rID.h);
         const rClk = this.getScreenRegion(CONFIG.screenRegions.clock) || CONFIG.regions.clock;
         ctx.strokeStyle = "rgba(255, 200, 0, 0.5)"; ctx.strokeRect(rClk.x, rClk.y, rClk.w, rClk.h);
+        if (this.zoneDraft) {
+            ctx.save();
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = this.zoneDraft.target === 'clock' ? "rgba(255, 200, 0, 0.9)" : "rgba(0, 150, 255, 0.9)";
+            const rect = this.clampToScreen(this.zoneDraft);
+            ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+            ctx.restore();
+        }
     }
     goBackToLive() {
         this.mode = 'LIVE';
@@ -893,6 +980,7 @@ function initZoneControls(ui) {
     });
 
     setInputs(CONFIG.screenRegions);
+    window.updateZoneInputs = setInputs;
 
     btnApply.onclick = () => {
         const next = {
