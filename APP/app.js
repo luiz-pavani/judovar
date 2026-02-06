@@ -103,6 +103,7 @@ class LibraryManager {
                     const video = document.getElementById('vid-cam');
                     video.srcObject = null; video.src = url; video.play();
                     window.videoMgr.mode = 'FILE';
+                    window.videoMgr.resizeCanvas();
                     document.getElementById('replay-overlay').style.display = 'flex';
                     document.getElementById('main-canvas').classList.add('replay-full');
                 };
@@ -162,6 +163,11 @@ class VideoManager {
     }
 
     resizeCanvas() {
+        if (this.mode === 'LIVE') {
+            this.canvasMain.width = CONFIG.width;
+            this.canvasMain.height = CONFIG.height;
+            return;
+        }
         const stage = document.querySelector('.video-stage');
         if (!stage) return;
         const rect = stage.getBoundingClientRect();
@@ -270,6 +276,7 @@ class VideoManager {
         if (this.vidCam.srcObject) this.vidCam.play();
         this.replay.exitReplayMode();
         this.resetZoom();
+        this.resizeCanvas();
         document.getElementById('main-canvas').classList.remove('replay-full');
         document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
         this.ui.log("AO VIVO", "neutral");
@@ -529,6 +536,7 @@ class ReplaySystem {
     enterReplayMode() {
         if(this.isReplaying) return;
         this.isReplaying = true; window.videoMgr.mode = 'REPLAY';
+        window.videoMgr.resizeCanvas();
         document.getElementById('replay-overlay').style.display = 'flex';
         this.playbackSpeed = 0.5;
         this.setPlayIcon(true);
