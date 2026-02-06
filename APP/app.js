@@ -50,14 +50,29 @@ class LibraryManager {
     constructor(ui) {
         this.ui = ui;
         this.dirHandle = null;
+        this.hasWritePermission = false;
         this.fileListEl = document.getElementById('file-list');
         const btnFolder = document.getElementById('btn-folder');
         btnFolder.onclick = () => this.selectFolder();
         document.getElementById('btn-refresh').onclick = () => this.refreshList();
     }
+    async ensureWritePermission(allowRequest = false) {
+        if (!this.dirHandle) return false;
+        try {
+            const current = await this.dirHandle.queryPermission({ mode: 'readwrite' });
+            if (current === 'granted') { this.hasWritePermission = true; return true; }
+            if (!allowRequest) return false;
+            const requested = await this.dirHandle.requestPermission({ mode: 'readwrite' });
+            this.hasWritePermission = requested === 'granted';
+            return this.hasWritePermission;
+        } catch (e) {
+            return false;
+        }
+    }
     async selectFolder() {
         try {
             this.dirHandle = await window.showDirectoryPicker();
+            await this.ensureWritePermission(true);
             const btn = document.getElementById('btn-folder');
             btn.classList.add('btn-success'); btn.innerText = "📂 1. PASTA OK";
             this.ui.log("Pasta Conectada"); await this.refreshList();
@@ -183,7 +198,9 @@ class VideoManager {
 
     async selectCam() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720, frameRate: { ideal: 30, max: 30 } }
+            });
             this.vidCam.srcObject = stream; this.vidCam.play();
             document.getElementById('btn-cam').classList.add('active'); this.ui.log("Câmera OK");
         } catch(e) { alert("Erro Câmera: " + e.message); }
@@ -222,6 +239,7 @@ class VideoManager {
     goBackToLive() {
         this.mode = 'LIVE';
         if (this.vidCam.src && !this.vidCam.srcObject) this.vidCam.src = "";
+        if (this.vidCam.srcObject) this.vidCam.play();
         this.replay.exitReplayMode();
         this.resetZoom();
         document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
@@ -247,8 +265,8 @@ class ReplaySystem {
         if (!this.fileVideo) return;
         this.fileVideo.onloadedmetadata = () => this.updateFileUI();
         this.fileVideo.ontimeupdate = () => this.updateFileUI();
-        this.fileVideo.onplay = () => this.updateFileUI();
-        this.fileVideo.onpause = () => this.updateFileUI();
+        this.fileVideo.onplay = () => { this.setPlayIcon(true); this.updateFileUI(); };
+        this.fileVideo.onpause = () => { this.setPlayIcon(false); this.updateFileUI(); };
     }
     isFileMode() {
         return window.videoMgr && window.videoMgr.mode === 'FILE';
@@ -277,6 +295,11 @@ class ReplaySystem {
             if (playIcon) playIcon.innerText = "play_arrow";
         }
     }
+    setPlayIcon(isPlaying) {
+        const icon = document.querySelector('#btn-play-pause span');
+        if (!icon) return;
+        icon.innerText = isPlaying ? "pause" : "play_arrow";
+    }
     stepFile(dir) {
         if (!this.fileVideo || !isFinite(this.fileVideo.duration)) return;
         this.fileVideo.pause();
@@ -304,6 +327,7 @@ class ReplaySystem {
                 this.toggleFilePlay(playIcon);
                 return;
             }
+            if (!this.isReplaying) this.enterReplayMode();
             if (this.playbackSpeed > 0) { this.playbackSpeed = 0; playIcon.innerText = "play_arrow"; }
             else { this.playbackSpeed = 1.0; playIcon.innerText = "pause"; }
         };
@@ -360,7 +384,6 @@ class ReplaySystem {
                     this.updateFileUI();
                 } else {
                     this.enterReplayMode(); this.playbackSpeed = 0; playIcon.innerText="play_arrow";
-                    if (this.buffer.length > 30) this.currentIndex = this.buffer.length - 31; else this.currentIndex = 0;
                     this.updateTimeDisplay();
                 }
                 this.jogAcc = 0; e.preventDefault(); 
@@ -375,7 +398,7 @@ class ReplaySystem {
                 let delta = currentAngle - lastAngle;
                 if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
                 this.jogAcc += delta;
-                if (Math.abs(this.jogAcc) > 5) {
+                if (Math.abs(this.jogAcc) > 2) {
                     const dir = Math.sign(this.jogAcc); 
                     if (this.isFileMode()) this.stepFile(dir);
                     else this.step(dir); 
@@ -422,11 +445,12 @@ class ReplaySystem {
         this.isReplaying = true; window.videoMgr.mode = 'REPLAY';
         document.getElementById('replay-overlay').style.display = 'flex';
         this.playbackSpeed = 0.5;
+        this.setPlayIcon(true);
     }
     exitReplayMode() {
         this.isReplaying = false; document.getElementById('replay-overlay').style.display = 'none';
         this.slider.value = 100; this.timeDisplay.innerText = "LIVE";
-        document.querySelector('#btn-play-pause span').innerText = "play_arrow";
+        this.setPlayIcon(false);
         this.loopA = null; this.loopB = null;
         document.getElementById('btn-loop-a').classList.remove('active');
         document.getElementById('btn-loop-b').classList.remove('active');
@@ -579,21 +603,26 @@ class Recorder {
         this.ui = ui; this.library = library; this.mediaRecorder = null; this.startTime = 0; this.currentFilenameBase = "";
         document.getElementById('btn-new-match').onclick = () => {
             const manualName = document.getElementById('match-id-input').value || "Manual_" + Date.now();
-            this.start(manualName);
+            this.start(manualName, true);
         };
         document.getElementById('btn-stop-rec').onclick = () => this.stop();
     }
     async switchFile(id) { 
         if(this.mediaRecorder && this.mediaRecorder.state==="recording") { 
             this.ui.log(`Fim Automático: ${this.currentFilenameBase}`, "neutral");
-            this.stop(); setTimeout(()=>this.start(id), 1500); 
+            this.stop(); setTimeout(()=>this.start(id, false), 1500); 
         } else {
             this.ui.log(`Início Automático: ${id}`, "highlight");
-            this.start(id);
+            this.start(id, false);
         }
     }
-    async start(base) {
+    async start(base, allowPermissionRequest = false) {
         if(!this.library.dirHandle) { this.ui.log("ERRO: Selecione a PASTA!", "alert"); return; }
+        const hasPerm = await this.library.ensureWritePermission(allowPermissionRequest);
+        if (!hasPerm) {
+            this.ui.log("Permissão necessária. Clique em PASTA para autorizar.", "alert");
+            return;
+        }
         const cam = document.getElementById('vid-cam');
         if (!cam || (!cam.srcObject && !cam.src)) { this.ui.log("ERRO: Conecte a CÂMERA!", "alert"); return; }
         document.getElementById('match-id-input').value = base;
