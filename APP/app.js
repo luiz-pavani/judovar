@@ -35,6 +35,10 @@ const CONFIG = {
         id: { x: 5, y: 610, w: 85, h: 100 },
         clock: { x: 425, y: 610, w: 215, h: 100 }
     },
+    screenRegions: {
+        id: { x: 15, y: 750, w: 255, h: 300 },
+        clock: { x: 1275, y: 750, w: 645, h: 300 }
+    },
     colors: {
         isYellow: (r,g,b) => r > 200 && g > 180 && b < 100,
         isWhite: (r,g,b) => r > 200 && g > 200 && b > 200
@@ -137,6 +141,7 @@ class VideoManager {
         this.ctxMain.fillText("1. Clique em CÂMERA", 240, 180); this.ctxMain.fillText("2. Clique em PLACAR", 240, 540);
         
         this.showZones = true;
+        this.screenRect = null;
         this.scale = 1; this.panning = false; this.pointX = 0; this.pointY = 0; this.startX = 0; this.startY = 0;
         this.setupZoom();
         this.resizeCanvas();
@@ -239,7 +244,8 @@ class VideoManager {
             }
             
             if (this.vidScreen.readyState >= 2) {
-                this.drawContain(this.vidScreen, 0, halfH, cw, halfH);
+                const screenRect = this.drawContain(this.vidScreen, 0, halfH, cw, halfH);
+                if (screenRect) this.screenRect = screenRect;
                 this.brain.processFrame(this.canvasMain); 
             }
             if (this.showZones) this.drawOverlay();
@@ -269,7 +275,7 @@ class VideoManager {
         const dy = Math.floor((ch - dh) / 2);
         this.ctxMain.drawImage(frame, dx, dy, dw, dh);
     }
-    drawContain(video, x, y, w, h) {
+    getContainRect(video, x, y, w, h) {
         const vw = video.videoWidth || video.width || 1280;
         const vh = video.videoHeight || video.height || 720;
         const scale = Math.min(w / vw, h / vh);
@@ -277,18 +283,37 @@ class VideoManager {
         const dh = vh * scale;
         const dx = x + (w - dw) / 2;
         const dy = y + (h - dh) / 2;
+        return { x: dx, y: dy, w: dw, h: dh, videoWidth: vw, videoHeight: vh };
+    }
+    drawContain(video, x, y, w, h) {
+        const rect = this.getContainRect(video, x, y, w, h);
         this.ctxMain.save();
         this.ctxMain.beginPath();
         this.ctxMain.rect(x, y, w, h);
         this.ctxMain.clip();
-        this.ctxMain.drawImage(video, dx, dy, dw, dh);
+        this.ctxMain.drawImage(video, rect.x, rect.y, rect.w, rect.h);
         this.ctxMain.restore();
+        return rect;
+    }
+    getScreenRegion(region) {
+        if (!this.screenRect) return null;
+        const rect = this.screenRect;
+        const scaleX = rect.w / rect.videoWidth;
+        const scaleY = rect.h / rect.videoHeight;
+        return {
+            x: rect.x + (region.x * scaleX),
+            y: rect.y + (region.y * scaleY),
+            w: region.w * scaleX,
+            h: region.h * scaleY
+        };
     }
     drawOverlay() {
         const ctx = this.ctxMain; ctx.lineWidth = 2;
         ctx.strokeStyle = "#00ff00"; ctx.beginPath(); ctx.moveTo(0, 360); ctx.lineTo(640, 360); ctx.stroke();
-        const rID = CONFIG.regions.id; ctx.strokeStyle = "rgba(0, 150, 255, 0.5)"; ctx.strokeRect(rID.x, rID.y, rID.w, rID.h);
-        const rClk = CONFIG.regions.clock; ctx.strokeStyle = "rgba(255, 200, 0, 0.5)"; ctx.strokeRect(rClk.x, rClk.y, rClk.w, rClk.h);
+        const rID = this.getScreenRegion(CONFIG.screenRegions.id) || CONFIG.regions.id;
+        ctx.strokeStyle = "rgba(0, 150, 255, 0.5)"; ctx.strokeRect(rID.x, rID.y, rID.w, rID.h);
+        const rClk = this.getScreenRegion(CONFIG.screenRegions.clock) || CONFIG.regions.clock;
+        ctx.strokeStyle = "rgba(255, 200, 0, 0.5)"; ctx.strokeRect(rClk.x, rClk.y, rClk.w, rClk.h);
     }
     goBackToLive() {
         this.mode = 'LIVE';
@@ -612,8 +637,12 @@ class Brain {
     processFrame(sourceCanvas) {
         const cID = document.getElementById('debug-canvas-id');
         const cClk = document.getElementById('debug-canvas-clock');
-        this.ctxDebugClock.drawImage(sourceCanvas, CONFIG.regions.clock.x, CONFIG.regions.clock.y, CONFIG.regions.clock.w, CONFIG.regions.clock.h, 0, 0, cClk.width, cClk.height);
-        this.ctxDebugID.drawImage(sourceCanvas, CONFIG.regions.id.x, CONFIG.regions.id.y, CONFIG.regions.id.w, CONFIG.regions.id.h, 0, 0, cID.width, cID.height);
+        const mappedClock = window.videoMgr?.getScreenRegion(CONFIG.screenRegions.clock);
+        const mappedID = window.videoMgr?.getScreenRegion(CONFIG.screenRegions.id);
+        const rClk = mappedClock || CONFIG.regions.clock;
+        const rID = mappedID || CONFIG.regions.id;
+        this.ctxDebugClock.drawImage(sourceCanvas, rClk.x, rClk.y, rClk.w, rClk.h, 0, 0, cClk.width, cClk.height);
+        this.ctxDebugID.drawImage(sourceCanvas, rID.x, rID.y, rID.w, rID.h, 0, 0, cID.width, cID.height);
         const now = Date.now();
         if (now - this.lastOCRTime > 1000) { this.runOCR(); this.lastOCRTime = now; }
         if (now - this.lastColorCheck > 150) { this.analyzeClockColor(); this.lastColorCheck = now; }
