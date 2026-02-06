@@ -28,6 +28,11 @@ function initFirebase(config) {
 }
 
 
+const DEFAULT_SCREEN_REGIONS = {
+    id: { x: 15, y: 750, w: 255, h: 300 },
+    clock: { x: 1275, y: 750, w: 645, h: 300 }
+};
+
 const CONFIG = {
     width: 640,
     height: 720, 
@@ -35,10 +40,7 @@ const CONFIG = {
         id: { x: 5, y: 610, w: 85, h: 100 },
         clock: { x: 425, y: 610, w: 215, h: 100 }
     },
-    screenRegions: {
-        id: { x: 15, y: 750, w: 255, h: 300 },
-        clock: { x: 1275, y: 750, w: 645, h: 300 }
-    },
+    screenRegions: { ...DEFAULT_SCREEN_REGIONS },
     colors: {
         isYellow: (r,g,b) => r > 200 && g > 180 && b < 100,
         isWhite: (r,g,b) => r > 200 && g > 200 && b > 200
@@ -48,6 +50,36 @@ const CONFIG = {
         fps: 30
     }
 };
+
+const ZONE_STORAGE_KEY = 'robotZonesV1';
+
+function sanitizeRegion(region, fallback) {
+    const x = Number(region?.x); const y = Number(region?.y);
+    const w = Number(region?.w); const h = Number(region?.h);
+    if (![x,y,w,h].every(n => Number.isFinite(n) && n >= 0)) return { ...fallback };
+    return { x, y, w, h };
+}
+
+function loadScreenRegions() {
+    try {
+        const raw = localStorage.getItem(ZONE_STORAGE_KEY);
+        if (!raw) return { ...DEFAULT_SCREEN_REGIONS };
+        const parsed = JSON.parse(raw);
+        return {
+            id: sanitizeRegion(parsed.id, DEFAULT_SCREEN_REGIONS.id),
+            clock: sanitizeRegion(parsed.clock, DEFAULT_SCREEN_REGIONS.clock)
+        };
+    } catch (e) {
+        return { ...DEFAULT_SCREEN_REGIONS };
+    }
+}
+
+function saveScreenRegions(regions) {
+    localStorage.setItem(ZONE_STORAGE_KEY, JSON.stringify(regions));
+    CONFIG.screenRegions = regions;
+}
+
+CONFIG.screenRegions = loadScreenRegions();
 
 // --- 1. LIBRARY MANAGER ---
 class LibraryManager {
@@ -817,6 +849,67 @@ class Recorder {
     }
 }
 
+function initZoneControls(ui) {
+    const ids = {
+        id: {
+            x: document.getElementById('zone-id-x'),
+            y: document.getElementById('zone-id-y'),
+            w: document.getElementById('zone-id-w'),
+            h: document.getElementById('zone-id-h')
+        },
+        clock: {
+            x: document.getElementById('zone-clock-x'),
+            y: document.getElementById('zone-clock-y'),
+            w: document.getElementById('zone-clock-w'),
+            h: document.getElementById('zone-clock-h')
+        }
+    };
+    const btnApply = document.getElementById('btn-zone-apply');
+    const btnReset = document.getElementById('btn-zone-reset');
+    if (!btnApply || !btnReset) return;
+
+    const setInputs = (regions) => {
+        Object.keys(ids).forEach(key => {
+            ids[key].x.value = regions[key].x;
+            ids[key].y.value = regions[key].y;
+            ids[key].w.value = regions[key].w;
+            ids[key].h.value = regions[key].h;
+        });
+    };
+
+    const readInputs = () => ({
+        id: {
+            x: Number(ids.id.x.value),
+            y: Number(ids.id.y.value),
+            w: Number(ids.id.w.value),
+            h: Number(ids.id.h.value)
+        },
+        clock: {
+            x: Number(ids.clock.x.value),
+            y: Number(ids.clock.y.value),
+            w: Number(ids.clock.w.value),
+            h: Number(ids.clock.h.value)
+        }
+    });
+
+    setInputs(CONFIG.screenRegions);
+
+    btnApply.onclick = () => {
+        const next = {
+            id: sanitizeRegion(readInputs().id, CONFIG.screenRegions.id),
+            clock: sanitizeRegion(readInputs().clock, CONFIG.screenRegions.clock)
+        };
+        saveScreenRegions(next);
+        if (ui) ui.log("Zonas atualizadas", "neutral");
+    };
+
+    btnReset.onclick = () => {
+        saveScreenRegions({ ...DEFAULT_SCREEN_REGIONS });
+        setInputs(CONFIG.screenRegions);
+        if (ui) ui.log("Zonas resetadas", "neutral");
+    };
+}
+
 // BOOT
 async function initApp() {
     try {
@@ -832,6 +925,8 @@ async function initApp() {
     const brain = new Brain(ui); window.brain = brain;
     const videoMgr = new VideoManager(ui, brain, replay); window.videoMgr = videoMgr;
     const recorder = new Recorder(ui, library); window.recorder = recorder;
+
+    initZoneControls(ui);
 }
 
 initApp();
