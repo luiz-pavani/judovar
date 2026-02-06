@@ -438,6 +438,7 @@ class ReplaySystem {
         this.currentIndex += dir;
         if (this.currentIndex < 0) this.currentIndex = 0;
         if (this.currentIndex >= this.buffer.length) this.currentIndex = this.buffer.length - 1;
+        if (this.buffer.length > 1) this.slider.value = (this.currentIndex / (this.buffer.length - 1)) * 100;
         this.updateTimeDisplay();
     }
     enterReplayMode() {
@@ -466,6 +467,7 @@ class ReplaySystem {
         if(frame) {
             const diff = (Date.now() - frame.timestamp) / 1000;
             this.timeDisplay.innerText = `-${diff.toFixed(1)}s`;
+            if (this.buffer.length > 1) this.slider.value = (this.currentIndex / (this.buffer.length - 1)) * 100;
         }
     }
     jumpToTimestamp(targetTime) {
