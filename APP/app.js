@@ -8,24 +8,23 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyCXFkxVobLUeDBxiLqPxAc9oETPiWLO05Q",
-    authDomain: "smaart-pro-var.firebaseapp.com",
-    projectId: "smaart-pro-var",
-    storageBucket: "smaart-pro-var.firebasestorage.app",
-    messagingSenderId: "776584640206",
-    appId: "1:776584640206:web:430b8ddd3c7cd015d0829f",
-    measurementId: "G-1X0WX6WJ13"
-};
-
-// Inicializa Firebase
 let db = null;
-try {
-    const app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    console.log("Firebase conectado:", firebaseConfig.projectId);
-} catch (e) {
-    console.error("Erro Firebase Init:", e);
+let firebaseConfig = null;
+
+async function loadFirebaseConfig() {
+    const res = await fetch('./config.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('config.json não encontrado');
+    return res.json();
+}
+
+function initFirebase(config) {
+    try {
+        const app = initializeApp(config);
+        db = getFirestore(app);
+        console.log("Firebase conectado:", config.projectId);
+    } catch (e) {
+        console.error("Erro Firebase Init:", e);
+    }
 }
 
 
@@ -644,9 +643,20 @@ class Recorder {
 }
 
 // BOOT
-const ui = new UI();
-const library = new LibraryManager(ui); window.library = library;
-const replay = new ReplaySystem(); window.replay = replay;
-const brain = new Brain(ui); window.brain = brain;
-const videoMgr = new VideoManager(ui, brain, replay); window.videoMgr = videoMgr;
-const recorder = new Recorder(ui, library); window.recorder = recorder;
+async function initApp() {
+    try {
+        firebaseConfig = await loadFirebaseConfig();
+        initFirebase(firebaseConfig);
+    } catch (e) {
+        console.warn("Firebase desativado:", e.message);
+    }
+
+    const ui = new UI();
+    const library = new LibraryManager(ui); window.library = library;
+    const replay = new ReplaySystem(); window.replay = replay;
+    const brain = new Brain(ui); window.brain = brain;
+    const videoMgr = new VideoManager(ui, brain, replay); window.videoMgr = videoMgr;
+    const recorder = new Recorder(ui, library); window.recorder = recorder;
+}
+
+initApp();
