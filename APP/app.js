@@ -138,6 +138,8 @@ class VideoManager {
         this.showZones = true;
         this.scale = 1; this.panning = false; this.pointX = 0; this.pointY = 0; this.startX = 0; this.startY = 0;
         this.setupZoom();
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
 
         document.getElementById('btn-cam').onclick = () => this.selectCam();
         document.getElementById('btn-screen').onclick = () => this.selectScreen();
@@ -157,6 +159,14 @@ class VideoManager {
         btnZones.onclick = () => { this.showZones = !this.showZones; applyZoneState(); };
 
         this.loop();
+    }
+
+    resizeCanvas() {
+        const stage = document.querySelector('.video-stage');
+        if (!stage) return;
+        const rect = stage.getBoundingClientRect();
+        this.canvasMain.width = rect.width;
+        this.canvasMain.height = rect.height;
     }
 
     setupZoom() {
