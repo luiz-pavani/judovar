@@ -227,9 +227,12 @@ class VideoManager {
     loop() {
         requestAnimationFrame(() => this.loop());
         if (this.mode === 'LIVE') {
-            if (this.vidCam.readyState >= 2) this.ctxMain.drawImage(this.vidCam, 0, 0, 640, 360);
+            const cw = this.canvasMain.width;
+            const ch = this.canvasMain.height;
+            const halfH = ch / 2;
+            if (this.vidCam.readyState >= 2) this.ctxMain.drawImage(this.vidCam, 0, 0, cw, halfH);
             if (this.vidScreen.readyState >= 2) {
-                this.ctxMain.drawImage(this.vidScreen, 0, 360, 640, 360);
+                this.ctxMain.drawImage(this.vidScreen, 0, halfH, cw, halfH);
                 this.brain.processFrame(this.canvasMain); 
             }
             if (this.showZones) this.drawOverlay();
