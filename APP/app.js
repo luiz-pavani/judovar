@@ -221,14 +221,28 @@ class VideoManager {
                 this.brain.processFrame(this.canvasMain); 
             }
             if (this.showZones) this.drawOverlay();
-            this.replay.captureFrame(this.canvasMain);
+            this.replay.captureFrame(this.vidCam);
         } else if (this.mode === 'REPLAY') {
             const frame = this.replay.getFrameToDraw();
-            if (frame) this.ctxMain.drawImage(frame, 0, 0);
+            if (frame) this.drawReplayFrame(frame);
             this.replay.autoPlayTick();
         } else if (this.mode === 'FILE') {
              if (this.vidCam.readyState >= 2) this.ctxMain.drawImage(this.vidCam, 0, 0, 640, 360);
         }
+    }
+    drawReplayFrame(frame) {
+        const cw = this.canvasMain.width;
+        const ch = this.canvasMain.height;
+        this.ctxMain.fillStyle = "#000";
+        this.ctxMain.fillRect(0, 0, cw, ch);
+        const fw = frame.width || 640;
+        const fh = frame.height || 360;
+        const scale = Math.min(cw / fw, ch / fh);
+        const dw = Math.floor(fw * scale);
+        const dh = Math.floor(fh * scale);
+        const dx = Math.floor((cw - dw) / 2);
+        const dy = Math.floor((ch - dh) / 2);
+        this.ctxMain.drawImage(frame, dx, dy, dw, dh);
     }
     drawOverlay() {
         const ctx = this.ctxMain; ctx.lineWidth = 2;
@@ -308,16 +322,70 @@ class ReplaySystem {
         this.fileVideo.currentTime = next;
         this.updateFileUI();
     }
+    jumpFileSeconds(sec) {
+        if (!this.fileVideo || !isFinite(this.fileVideo.duration)) return;
+        this.fileVideo.pause();
+        const next = Math.min(Math.max(0, this.fileVideo.currentTime + sec), this.fileVideo.duration);
+        this.fileVideo.currentTime = next;
+        this.updateFileUI();
+    }
+    jumpReplaySeconds(sec) {
+        this.enterReplayMode();
+        this.playbackSpeed = 0;
+        const frame = this.buffer[Math.floor(this.currentIndex)];
+        if (!frame) return;
+        const target = frame.timestamp + (sec * 1000);
+        let best = this.currentIndex, min = Infinity;
+        for (let i = 0; i < this.buffer.length; i++) {
+            const diff = Math.abs(this.buffer[i].timestamp - target);
+            if (diff < min) { min = diff; best = i; }
+        }
+        this.currentIndex = best;
+        this.updateTimeDisplay();
+        this.setPlayIcon(false);
+    }
     setupHotkeys() {
         document.addEventListener('keydown', (e) => {
             if (document.activeElement.tagName === 'INPUT') return;
             switch(e.code) {
                 case 'Space': e.preventDefault(); document.getElementById('btn-play-pause').click(); break;
-                case 'ArrowLeft': e.preventDefault(); this.enterReplayMode(); this.playbackSpeed = 0; this.step(-1); break;
-                case 'ArrowRight': e.preventDefault(); this.enterReplayMode(); this.playbackSpeed = 0; this.step(1); break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (this.isFileMode()) { this.stepFile(-1); this.setPlayIcon(false); }
+                    else { this.enterReplayMode(); this.playbackSpeed = 0; this.step(-1); }
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (this.isFileMode()) { this.stepFile(1); this.setPlayIcon(false); }
+                    else { this.enterReplayMode(); this.playbackSpeed = 0; this.step(1); }
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (this.isFileMode()) this.jumpFileSeconds(5);
+                    else this.jumpReplaySeconds(5);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (this.isFileMode()) this.jumpFileSeconds(-5);
+                    else this.jumpReplaySeconds(-5);
+                    break;
+                case 'KeyA': e.preventDefault(); document.getElementById('btn-loop-a').click(); break;
+                case 'KeyB': e.preventDefault(); document.getElementById('btn-loop-b').click(); break;
+                case 'KeyC': e.preventDefault(); document.getElementById('btn-loop-clr').click(); break;
+                case 'Digit1': e.preventDefault(); document.getElementById('btn-speed-100').click(); break;
+                case 'Digit2': e.preventDefault(); document.getElementById('btn-speed-050').click(); break;
+                case 'Digit3': e.preventDefault(); this.setSpeedCustom(0.33); break;
+                case 'Digit4': e.preventDefault(); document.getElementById('btn-speed-025').click(); break;
+                case 'Enter': e.preventDefault(); window.videoMgr.goBackToLive(); break;
                 case 'Escape': e.preventDefault(); window.videoMgr.goBackToLive(); break;
             }
         });
+    }
+    setSpeedCustom(s) {
+        if (this.isFileMode() && this.fileVideo) this.fileVideo.playbackRate = s;
+        this.playbackSpeed = s;
+        document.querySelectorAll('.speed-group button').forEach(b => b.classList.remove('active'));
+        this.setPlayIcon(s > 0);
     }
     setupControls() {
         const btnPlay = document.getElementById('btn-play-pause');
@@ -409,8 +477,10 @@ class ReplaySystem {
             });
         }
     }
-    captureFrame(canvas) {
-        createImageBitmap(canvas).then(bmp => {
+    captureFrame(source) {
+        if (!source) return;
+        if (source.readyState !== undefined && source.readyState < 2) return;
+        createImageBitmap(source).then(bmp => {
             this.buffer.push({ img: bmp, timestamp: Date.now() });
             if (this.buffer.length > this.maxFrames) {
                 const old = this.buffer.shift(); old.img.close();
