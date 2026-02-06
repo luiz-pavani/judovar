@@ -104,6 +104,7 @@ class LibraryManager {
                     video.srcObject = null; video.src = url; video.play();
                     window.videoMgr.mode = 'FILE';
                     document.getElementById('replay-overlay').style.display = 'flex';
+                    document.getElementById('main-canvas').classList.add('replay-full');
                 };
                 this.fileListEl.appendChild(div);
             });
@@ -227,7 +228,10 @@ class VideoManager {
             if (frame) this.drawReplayFrame(frame);
             this.replay.autoPlayTick();
         } else if (this.mode === 'FILE') {
-             if (this.vidCam.readyState >= 2) this.ctxMain.drawImage(this.vidCam, 0, 0, 640, 360);
+             if (this.vidCam.readyState >= 2) {
+                const frame = this.vidCam;
+                this.drawReplayFrame(frame);
+             }
         }
     }
     drawReplayFrame(frame) {
@@ -256,6 +260,7 @@ class VideoManager {
         if (this.vidCam.srcObject) this.vidCam.play();
         this.replay.exitReplayMode();
         this.resetZoom();
+        document.getElementById('main-canvas').classList.remove('replay-full');
         document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
         this.ui.log("AO VIVO", "neutral");
     }
