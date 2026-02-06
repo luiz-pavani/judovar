@@ -235,25 +235,11 @@ class VideoManager {
             this.ctxMain.fillRect(0, 0, cw, ch);
             
             if (this.vidCam.readyState >= 2) {
-                const vw = this.vidCam.videoWidth || 1280;
-                const vh = this.vidCam.videoHeight || 720;
-                const scale = cw / vw;
-                const dw = cw;
-                const dh = vh * scale;
-                const dx = 0;
-                const dy = (halfH - dh) / 2;
-                this.ctxMain.drawImage(this.vidCam, dx, dy, dw, dh);
+                this.drawContain(this.vidCam, 0, 0, cw, halfH);
             }
             
             if (this.vidScreen.readyState >= 2) {
-                const vw = this.vidScreen.videoWidth || 1920;
-                const vh = this.vidScreen.videoHeight || 1080;
-                const scale = cw / vw;
-                const dw = cw;
-                const dh = vh * scale;
-                const dx = 0;
-                const dy = halfH + (halfH - dh) / 2;
-                this.ctxMain.drawImage(this.vidScreen, dx, dy, dw, dh);
+                this.drawContain(this.vidScreen, 0, halfH, cw, halfH);
                 this.brain.processFrame(this.canvasMain); 
             }
             if (this.showZones) this.drawOverlay();
@@ -282,6 +268,21 @@ class VideoManager {
         const dx = Math.floor((cw - dw) / 2);
         const dy = Math.floor((ch - dh) / 2);
         this.ctxMain.drawImage(frame, dx, dy, dw, dh);
+    }
+    drawContain(video, x, y, w, h) {
+        const vw = video.videoWidth || video.width || 1280;
+        const vh = video.videoHeight || video.height || 720;
+        const scale = Math.min(w / vw, h / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        const dx = x + (w - dw) / 2;
+        const dy = y + (h - dh) / 2;
+        this.ctxMain.save();
+        this.ctxMain.beginPath();
+        this.ctxMain.rect(x, y, w, h);
+        this.ctxMain.clip();
+        this.ctxMain.drawImage(video, dx, dy, dw, dh);
+        this.ctxMain.restore();
     }
     drawOverlay() {
         const ctx = this.ctxMain; ctx.lineWidth = 2;
