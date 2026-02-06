@@ -174,6 +174,7 @@ class VideoManager {
         
         this.showZones = true;
         this.screenRect = null;
+        this.camStream = null;
         this.isDrawingZone = false;
         this.zoneStart = null;
         this.zoneDraft = null;
@@ -313,6 +314,7 @@ class VideoManager {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: 1280, height: 720, frameRate: { ideal: 30, max: 30 } }
             });
+            this.camStream = stream;
             this.vidCam.srcObject = stream; this.vidCam.play();
             document.getElementById('btn-cam').classList.add('active'); this.ui.log("Câmera OK");
         } catch(e) { alert("Erro Câmera: " + e.message); }
@@ -436,6 +438,9 @@ class VideoManager {
     goBackToLive() {
         this.mode = 'LIVE';
         if (this.vidCam.src && !this.vidCam.srcObject) this.vidCam.src = "";
+        if (!this.vidCam.srcObject && this.camStream) {
+            this.vidCam.srcObject = this.camStream;
+        }
         if (this.vidCam.srcObject) this.vidCam.play();
         this.replay.exitReplayMode();
         this.resetZoom();
