@@ -237,11 +237,9 @@ class VideoManager {
     drawReplayFrame(frame) {
         const cw = this.canvasMain.width;
         const ch = this.canvasMain.height;
-        this.ctxMain.fillStyle = "#000";
-        this.ctxMain.fillRect(0, 0, cw, ch);
         const fw = frame.width || 640;
         const fh = frame.height || 360;
-        const scale = Math.min(cw / fw, ch / fh);
+        const scale = Math.max(cw / fw, ch / fh);
         const dw = Math.floor(fw * scale);
         const dh = Math.floor(fh * scale);
         const dx = Math.floor((cw - dw) / 2);
