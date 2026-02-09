@@ -1,6 +1,6 @@
 /**
  * SMAART CARE - APP.JS
- * Versão: 48.0 (Firebase Integrated)
+ * Versão: 49.0 (Beta 6)
  * Autor: Gemini & Luiz Pavani
  */
 
