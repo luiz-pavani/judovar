@@ -79,8 +79,22 @@ canvas[id^="debug-canvas"] { width: 100%; height: auto; border: 1px solid #333; 
 .log-item { padding: 8px 10px; border-bottom: 1px solid #222; font-size: 11px; color: #aaa; display: flex; justify-content: space-between; cursor: pointer; }
 .log-item:hover { background: #222; color: #fff; }
 .log-content { display: flex; align-items: center; gap: 5px; }
-.log-item.highlight { border-left: 3px solid #00e676; background: #1a2a1a; color: #fff; }
-.log-item.alert { border-left: 3px solid #ff1744; background: #2a1a1a; color: #fff; }
+.log-item.highlight, .log-item.alert {
+    font-size: 18px;
+    font-weight: bold;
+    padding: 18px 18px;
+    border-left-width: 8px;
+    letter-spacing: 1px;
+    margin: 8px 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    width: calc(100% + 24px);
+    max-width: none;
+    position: relative;
+    left: -12px;
+}
+.log-item.highlight { border-left: 8px solid #00e676; background: #1a2a1a; color: #fff; }
+.log-item.alert { border-left: 8px solid #ff1744; background: #2a1a1a; color: #fff; }
 
 /* --- DOCK UNIFICADO (DARK STEALTH MODE) --- */
 .bottom-dock {
